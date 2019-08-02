@@ -58,11 +58,6 @@ async def main():
 
 if __name__ == '__main__':
     start = time.time()
-
-    loop = asyncio.get_event_loop()
-
-    future = asyncio.ensure_future(main())
-    loop.run_until_complete(future)
-
+    asyncio.run(main())
     end = time.time()
     print('total: {:.2f}s'.format(end - start))

@@ -3,9 +3,8 @@ import aiohttp
 import asyncio
 import aiofiles
 import time
-from multiprocessing import Process
+from multiprocessing import Process, SimpleQueue
 import os
-import async_file
 
 
 async def request_web(session, web_site):
@@ -37,13 +36,25 @@ async def parse_html(session, url, html):
 
 
 async def write_chapter(book, name, content):
-    # async with aiofiles.open(r'E:\path\2\{}\{}'.format(book, name), mode='wb') as fw:
-    #     await fw.write(content)
-    async with async_file.aopen(r'E:\path\2\{}\{}'.format(book, name), mode='wb') as f:
-        await f.write(content)
+    async with aiofiles.open(r'E:\path\2\{}\{}'.format(book, name), mode='wb') as fw:
+        await fw.write(content)
 
 
-async def main():
+async def request_chapter_list(queue):
+    session = aiohttp.ClientSession()
+    while not queue.empty():
+        url = queue.get()
+        async with session.get(url) as resp:
+            html = await resp.text()
+        await parse_html(session, url, html)
+    await session.close()
+
+
+def main(queue):
+    asyncio.run(request_chapter_list(queue))
+
+
+def pro_func():
     urls = [
         "http://www.shuquge.com/txt/343/",
         "http://www.shuquge.com/txt/9249/",
@@ -51,18 +62,24 @@ async def main():
         "http://www.shuquge.com/txt/350/",
         "http://www.shuquge.com/txt/74671/"
     ]
-
-    session = aiohttp.ClientSession()
+    queue = SimpleQueue()
     for url in urls:
-        async with session.get(url) as resp:
-            html = await resp.text()
-        await parse_html(session, url, html)
+        queue.put(url)
 
-    await session.close()
+    cpu_count = os.cpu_count()
+    ps = []
+
+    for i in range(cpu_count):
+        p = Process(target=main, args=(queue,))
+        ps.append(p)
+        p.start()
+
+    for p in ps:
+        p.join()
 
 
 if __name__ == '__main__':
     start = time.time()
-    asyncio.run(main())
+    pro_func()
     end = time.time()
     print('total: {:.2f}s'.format(end - start))
